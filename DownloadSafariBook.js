@@ -1,4 +1,3 @@
-// ==UserScript==
 // @name         Download Safari Books
 // @namespace    http://tampermonkey.net/
 // @version      0.1
