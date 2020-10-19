@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         Download Safari Books
-// @namespace    http://tampermonkey.net/
+// @namespace    littledan.com
 // @version      0.1
 // @description  JavaScript Tool to Download a Safairi Online Book to ePub format.
 // @author       Daniel R. Little
