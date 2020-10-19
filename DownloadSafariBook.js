@@ -1,8 +1,9 @@
+// ==UserScript==
 // @name         Download Safari Books
 // @namespace    http://tampermonkey.net/
 // @version      0.1
-// @description  try to take over the world!
-// @author       You
+// @description  JavaScript Tool to Download a Safairi Online Book to ePub format.
+// @author       Daniel R. Little
 // @match        https://learning.oreilly.com/*
 // @grant        none
 // @require      https://code.jquery.com/jquery-3.5.1.min.js
