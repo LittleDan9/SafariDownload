@@ -12,17 +12,36 @@
 // @require      https://npmcdn.com/ejs/ejs.min.js
 // ==/UserScript==
 
-(function() {
-    'use strict';
+const jepub = new jEpub();
+var bookInfo;
+var bookDetails;
+var bookId;
+function getBookInfo(){
     const regEx = /\/[0-9]{13}\//g
     const baseURL = "https://learning.oreilly.com";
-    var bookId = window.location.href.match(regEx)[0].replaceAll('/','')//.replace('/','');
-    var bookInfo = $.get(baseURL + "/nest/epub/toc/?book_id=" + bookId, function(data){
-        console.log(data);
+    var bookId = window.location.href.match(regEx)[0].replaceAll('/','')
+    $.get(baseURL + "/nest/epub/toc/?book_id=" + bookId, handleBookInfo);
+}
+
+function handleBookInfo(data){
+    bookInfo = data;
+    getBookDetails();
+}
+
+function getBookDetails(){
+    $.get(baseURL + data.detail_url, function(date){bookDetails = data;});
+}
+
+
+(function() {
+    'use strict';
+    getBookInfo();
+    // const jepub = new jEpub();
+
+    $.get(baseURL + "/nest/epub/toc/?book_id=" + bookId, function(data){        
         $.get(baseURL + data.detail_url, function(detail){
             var html = $($.parseHTML(detail));
             var desc = html.find(".description").find("span")[0].outerHTML
-            const jepub = new jEpub();
             jepub.init({
                 i18n: 'en', // Internationalization
                 title: data.title,
@@ -47,28 +66,35 @@
                             result.stylesheets[j].url
                         }
                         // Replace all imge tags in the content with the code for the epub builder
-                        $.each(result.images, function(key, value){
-                            $.get(result.asset_base_url + value, function(img){
-                                console.log(img);
+                        if(result.images.length > 0){
+                            setEvents(result.images.length);
+                            console.log(imgEvents);
+                            $.each(result.images, function(key, value){
+                                var xhr = new XMLHttpRequest();
+                                xhr.onreadystatechange = function(){
+                                    if (xhr.readyState === XMLHttpRequest.DONE){
+                                        if (this.readyState == 4 && this.status == 200){
+                                            //console.log(this.response, typeof this.response);
+                                            jepub.image(this.response, value)
+                                        }
+                                        sendProgress();
+                                    }
+                                }
+                                xhr.open('GET', result.asset_base_url + value);
+                                xhr.responseType = 'blob';
+                                xhr.send();
                             });
-                            //console.log(result.asset_base_url + value);
-                        });
+                            pollEvents();
+                        }
                         //jepub.image(data: object, IMG_ID: string)
                         content.find("img").replaceWith("<%= " + $(this).attr("src") + " %>");
                         htmlSrc = content.html();
                         // Add Chapter to book
                         jepub.add(result.label, htmlSrc, result.order);
-
-                        //for(let j = 0; j < result.images.length; j++){
-                        //result.asset_base_url + result.images[j]
-                        //}
                     });
-                    //Inject Image into epub
-                    //jepub.add(data.items.label, result.data, i+1);
                 });
             }
         });
-
     });
     //download("https://learning.oreilly.com/nest/epub/toc/?book_id=" + bookId, "/test/text.json");
 })();
@@ -83,4 +109,23 @@ function download(url, filename) {
         }
       );
     });
+}
+var imgEvents = 0;
+function setEvents(count){
+    //console.log("Set Event: " + count);
+    imgEvents = imgEvents + count;
+}
+function sendProgress(){
+    //console.log("sendProgress");
+    //console.log(imgEvents);
+    imgEvents--;
+}
+
+function pollEvents(){
+    //console.log("pollEvents");
+    if(imgEvents > 0){
+        setTimeout(pollEvents, 300)
+    }else{
+        console.log("end");
+    }
 }
