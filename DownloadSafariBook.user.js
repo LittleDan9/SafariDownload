@@ -29,37 +29,40 @@
                 author: data.authors,
                 publisher: data.publisher.name,
                 description: desc,
-                tags: [ 'epub', 'tag' ], // optional
+                //tags: [ 'epub', 'tag' ], // optional
                 date: Date.parse(data.pub_data)
             });
             jepub.uuid(bookId);
-            console.log(data.items)
+            //console.log(data.items)
             for(var i = 0; i < data.items.length; i++){
                 $.get(baseURL + data.items[i].url, function(result){
-                    console.log(result);
-                    //Download Chapter Content
-                    content = $($.parseHTML(result.content));
-                    images = content.find("img");
-                    //Inject Stylesheets
-                    result.site_styles
-                    for(var j = 0; j < result.stylesheets.length; j++){
-                        result.stylesheets[i].url
-                    }
+                    // Download Chapter Content
+                    //console.log(result);
+                    $.get(result.content, function(HTML){
+                        var htmlSrc = HTML;
+                        var content = $('<div>' + htmlSrc + '</div>');
+                        //Inject Stylesheets
+                        result.site_styles
+                        for(let j = 0; j < result.stylesheets.length; j++){
+                            result.stylesheets[j].url
+                        }
+                        // Replace all imge tags in the content with the code for the epub builder
+                        $.each(result.images, function(key, value){
+                            $.get(result.asset_base_url + value, function(img){
+                                console.log(img);
+                            });
+                            //console.log(result.asset_base_url + value);
+                        });
+                        //jepub.image(data: object, IMG_ID: string)
+                        content.find("img").replaceWith("<%= " + $(this).attr("src") + " %>");
+                        htmlSrc = content.html();
+                        // Add Chapter to book
+                        jepub.add(result.label, htmlSrc, result.order);
 
-                    for(var j = 0; j < images.length; j++){
-                        // Find the images in the
-                        console.log(images[i]);
-                        //images[i].outerHTML = "<%= image[" + "test" + "] %>"
-                    }
-                    //Change Image Tags
-                    for(var j = 0; j < result.images.length; j++){
-
-
-
-                        //jepub.add(data.items.label, result.data, i+1);
-
-                        r//esult.asset_base_url + result.images[i]
-                    }                    
+                        //for(let j = 0; j < result.images.length; j++){
+                        //result.asset_base_url + result.images[j]
+                        //}
+                    });
                     //Inject Image into epub
                     //jepub.add(data.items.label, result.data, i+1);
                 });
