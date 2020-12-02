@@ -15,6 +15,7 @@
 (function() {
     'use strict';
     const jepub = new jEpub();
+    var chapters = Array()
     var bookInfo;
     var bookDetails;
     const regEx = /\/[0-9]{13}\//g
@@ -30,7 +31,7 @@
             .addClass("l1")
             .addClass("nav-icn")
             .html('<svg class="icon icon-download3"><use xlink:href="#icon-download3"></use></svg><span>Download as eBook</span>')
-            .click(function(){startDownload();});
+            .click(function(){console.log("Starting Download");startDownload();});
         var li = $("<li/>");
         li.append(button);
         $("div.drop-content ul:first").append(li);
@@ -54,8 +55,22 @@
                     date: Date.parse(bookData.pub_data)
                 });
                 jepub.uuid(bookId);
+                // console.log(bookData)
+                // return;
 
+                downloadImage(baseURL, "/covers/" + bookId + "/600w/").then(
+                    function(dlResult){
+                        var reader = new FileReader();
+                        reader.readAsArrayBuffer(dlResult.blob); 
+                        reader.onloadend = function() {
+                            var buffer = reader.result;
+                            jepub.cover(buffer);
+                        }                                    
+                    }
+                )
+                
                 // Download Chapter Content
+                chapters = Array(bookData.items.length);
                 var chapterPromises = [];
                 for(var i = 0; i < bookData.items.length; i++){
                     chapterPromises.push(getChapter(bookData.items[i]))              
@@ -64,14 +79,23 @@
                 Promise.allSettled(chapterPromises).then(
                     function(results){
                         console.log(results);
+                        console.log(chapters);
+                        for(var i = 0; i < chapters.length; i++){
+                            jepub.add(chapters[i].name, chapters[i].html, i+1);
+                        }
+                        console.log(jepub);
+                        jepub.generate('blob', function updateCallback(metadata){
+                            // TODO: Something better with ths progression data
+                            // console.log("progression: " + metadata.percent.toFixed(2) + " %");
+                        }).then(function(content){downloadBlob(content, bookData.title + ".epub");})
                     }
                 )
             })
         });
-        //download("https://learning.oreilly.com/nest/epub/toc/?book_id=" + bookId, "/test/text.json");
     }
 
     function getChapter(chapter){
+        // console.log(chapter)
         return new Promise((resolve, reject) => {
             $.ajax({
                 url: baseURL + chapter.url,
@@ -112,18 +136,25 @@
                         function(results) {
                             $.each(results, function(key, result){
                                 if(result.status === "fulfilled"){
+                                    let imgId = result.value.id;
+                                    imgId = imgId.substring(imgId.indexOf('/')+1);
+                                    imgId = imgId.substring(0, imgId.indexOf('.'))
+                                    //console.log(imgId)
                                     // Add image to the ebub array image array.
-                                    jepub.image(result.value.blob, result.value.id);
+                                    jepub.image(result.value.blob, imgId);
                                     // Add epub image replace code foreach img to DOM Tree
-                                    chapterDOMTree.find("img[src='" + result.value.id + "']").replaceWith("<%= image[" + result.value.id + "] %>");             
+                                    chapterDOMTree.find("img[src='" +  result.value.id + "']").replaceWith("<%= image['" + imgId + "'] %>");             
                                 }
                             });                       
+                            // jepub.add(chapterName, chapterDOMTree.html(), chapterOrder);
+                            chapters[chapterOrder-1] = {name: chapterName, html: chapterDOMTree.html()}
                             resolve();
                         }
                     );
                 }else{
                     // console.log("No Images");
-                    jepub.add(chapterName, chapterDOMTree.html(), chapterOrder);
+                    chapters[chapterOrder-1] = {name: chapterName, html: chapterDOMTree.html()}
+                    // jepub.add(chapterName, chapterDOMTree.html(), chapterOrder);
                     resolve();
                 }
             }catch(ex){
@@ -139,7 +170,7 @@
                 cache:false,
                 xhr: function(){
                     var xhr = new XMLHttpRequest();
-                    xhr.responseType= 'blob'
+                    xhr.responseType = 'blob'
                     return xhr;
                 },
                 success: function(imgBlob){
@@ -151,6 +182,22 @@
             });
         });
     };
+
+    function downloadBlob(blob, name = 'book.epub'){
+        const blobURL = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = blobURL;
+        link.download = name;
+        document.body.appendChild(link);
+
+        link.dispatchEvent(
+            new MouseEvent('click', {
+                bubbles: true,
+                cancelable: true,
+                view: window
+            })
+        );
+    }
 
     function download(url, filename) {
         fetch(url).then(function(t) {
