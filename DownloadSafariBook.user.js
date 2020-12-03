@@ -16,8 +16,6 @@
     'use strict';
     const jepub = new jEpub();
     var chapters = Array()
-    var bookInfo;
-    var bookDetails;
     const regEx = /\/[0-9]{13}\//g
     const baseURL = "https://learning.oreilly.com";
     var bookId = window.location.href.match(regEx)[0].replace(/\//g,'')
@@ -25,17 +23,18 @@
         console.error("Unable to extract book Id.");
         return;
     }else{
-        $("body").prepend('<svg style="position: absolute; width: 0; height: 0; overflow: hidden" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><defs><symbol id="icon-download3" viewBox="0 0 16 16"><path d="M23 14l-8 8-8-8h5v-12h6v12zM15 22h-15v8h30v-8h-15zM28 26h-4v-2h4v2z"></path></symbol></defs></svg>');
-        $("<style type='text/css'> .icon {display: inline-block;width: 1em;height: 1em;stroke-width: 0;stroke: currentColor;fill: currentColor;}</style>").appendTo("head");
+
+        $("<style type='text/css'>.svg-icon {width: 1em;height: 1em;} .svg-icon path, .svg-icon polygon, .svg-icon rect {fill: #4691f6;} .svg-icon circle {stroke: #4691f6; stroke-width: 1;}</style>").appendTo("head");
         var button = $("<a/>")
             .addClass("l1")
             .addClass("nav-icn")
-            .html('<svg class="icon icon-download3"><use xlink:href="#icon-download3"></use></svg><span>Download as eBook</span>')
+            .attr("href", "#")
+            .html('<svg class="svg-icon" viewBox="0 0 20 20"><path fill="none" d="M9.896,3.838L0.792,1.562v14.794l9.104,2.276L19,16.356V1.562L9.896,3.838z M9.327,17.332L1.93,15.219V3.27l7.397,1.585V17.332z M17.862,15.219l-7.397,2.113V4.855l7.397-1.585V15.219z"></path></svg><span>Download ePub</span>')
             .click(function(){console.log("Starting Download");startDownload();});
         var li = $("<li/>");
         li.append(button);
-        $("div.drop-content ul:first").append(li);
-        console.log("Probably need to inject a download button here to request user input to download the book.");
+
+        $("div.drop-content ul:first").children("li:nth-last-child(2)").after(li);
     }
 
     function startDownload(){
@@ -78,12 +77,13 @@
                 //console.log("test");
                 Promise.allSettled(chapterPromises).then(
                     function(results){
-                        console.log(results);
-                        console.log(chapters);
+                        // console.log(results);
+                        // console.log(chapters);
                         for(var i = 0; i < chapters.length; i++){
+                            //console.log(i + ". Add Content")
                             jepub.add(chapters[i].name, chapters[i].html, i+1);
                         }
-                        console.log(jepub);
+                        //console.log(jepub);
                         jepub.generate('blob', function updateCallback(metadata){
                             // TODO: Something better with ths progression data
                             // console.log("progression: " + metadata.percent.toFixed(2) + " %");
@@ -140,27 +140,37 @@
                                     imgId = imgId.substring(imgId.indexOf('/')+1);
                                     imgId = imgId.substring(0, imgId.indexOf('.'))
                                     //console.log(imgId)
-                                    // Add image to the ebub array image array.
+                                    // Add image to the ebub image array.
+                                    //console.log(chapterOrder + ". Add Image");
                                     jepub.image(result.value.blob, imgId);
                                     // Add epub image replace code foreach img to DOM Tree
-                                    chapterDOMTree.find("img[src='" +  result.value.id + "']").replaceWith("<%= image['" + imgId + "'] %>");             
+                                    //console.log(chapterDOMTree.find("img[src*='" +  imgId + "']"));
+                                    chapterDOMTree.find("img[src*='" +  imgId + "']").replaceWith("<%= image['" + imgId + "'] %>");            
                                 }
-                            });                       
-                            // jepub.add(chapterName, chapterDOMTree.html(), chapterOrder);
-                            chapters[chapterOrder-1] = {name: chapterName, html: chapterDOMTree.html()}
+                            });
+                            var html = chapterDOMTree.html().toString();
+                            html = html.replace(/&lt;/g, "<");
+                            html = html.replace(/&gt;/g, ">");
+                            addChapter(chapterName, html, chapterOrder);
                             resolve();
                         }
                     );
                 }else{
-                    // console.log("No Images");
-                    chapters[chapterOrder-1] = {name: chapterName, html: chapterDOMTree.html()}
-                    // jepub.add(chapterName, chapterDOMTree.html(), chapterOrder);
+                    addChapter(chapterName, chapterDOMTree.html(), chapterOrder);
                     resolve();
-                }
+                }            
+                
             }catch(ex){
                 reject(ex);
             }
         });
+    }
+
+    function addChapter(name, html, index){
+        // The order in the jepub.add doe not change the order of insertion into the epub
+        // Therefore, manually added them to an array based on the index of the chapter.
+        html = html.replace("<h2>" + name + "</h2>", "");
+        chapters[index-1] = {name: name, html: html};
     }
 
     let downloadImage = function(imgBaseURL, imgURL) {
