@@ -7,7 +7,7 @@
 // @match        https://learning.oreilly.com/*
 // @grant        none
 // @require      https://code.jquery.com/jquery-3.5.1.min.js
-// @require      https://unpkg.com/jepub/dist/jepub.min.js
+// @require      http://127.0.0.1:5500/dist/jepub.min.js
 // @require      https://cdnjs.cloudflare.com/ajax/libs/jszip/3.5.0/jszip.min.js
 // @require      https://npmcdn.com/ejs/ejs.min.js
 // ==/UserScript==
@@ -16,7 +16,7 @@
     'use strict';
     const jepub = new jEpub();
     var chapters = Array()
-    const regEx = /\/[0-9]{13}\//g
+    const regEx = /\/[0-9]{10,13}\//g
     const baseURL = "https://learning.oreilly.com";
     var bookId = window.location.href.match(regEx)[0].replace(/\//g,'')
     if(bookId === undefined){
@@ -29,15 +29,17 @@
             .addClass("l1")
             .addClass("nav-icn")
             .attr("href", "#")
+            .attr("id", "eBookDownload")
             .html('<svg class="svg-icon" viewBox="0 0 20 20"><path fill="none" d="M9.896,3.838L0.792,1.562v14.794l9.104,2.276L19,16.356V1.562L9.896,3.838z M9.327,17.332L1.93,15.219V3.27l7.397,1.585V17.332z M17.862,15.219l-7.397,2.113V4.855l7.397-1.585V15.219z"></path></svg><span>Download ePub</span>')
-            .click(function(){console.log("Starting Download");startDownload();});
+            .click(function(e){console.log("Starting Download");startDownload(e);});
         var li = $("<li/>");
         li.append(button);
 
         $("div.drop-content ul:first").children("li:nth-last-child(2)").after(li);
     }
 
-    function startDownload(){
+    function startDownload(e){
+        e.preventDefault();
         // Get the Book information
         $.get(baseURL + "/nest/epub/toc/?book_id=" + bookId, function(bookData){        
             //Get Book details
@@ -78,9 +80,13 @@
                 Promise.allSettled(chapterPromises).then(
                     function(results){
                         // console.log(results);
-                        // console.log(chapters);
+                        chapters = chapters.filter(function(e){return e != null;})
+                        console.log(chapters);
                         for(var i = 0; i < chapters.length; i++){
                             //console.log(i + ". Add Content")
+                            if(chapters[i].name.length == 0 && chapters[i].html.length > 0){
+                                chapter[i].name = "Undefined"
+                            }
                             jepub.add(chapters[i].name, chapters[i].html, i+1);
                         }
                         //console.log(jepub);
@@ -169,7 +175,10 @@
     function addChapter(name, html, index){
         // The order in the jepub.add doe not change the order of insertion into the epub
         // Therefore, manually added them to an array based on the index of the chapter.
-        html = html.replace("<h2>" + name + "</h2>", "");
+        console.log("Add " + name);
+        //html = html.replace("<h2>" + name + "</h2>", "");
+        //html = html.replace("<div class=\"chapter-title-wrap\">", "");)
+        //html = html.replace("<h2 class=\"chapter-title\">" + name + "</h2>", "");
         chapters[index-1] = {name: name, html: html};
     }
 
