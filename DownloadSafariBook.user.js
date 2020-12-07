@@ -25,6 +25,7 @@
     }else{
 
         $("<style type='text/css'>.svg-icon {width: 1em;height: 1em;} .svg-icon path, .svg-icon polygon, .svg-icon rect {fill: #4691f6;} .svg-icon circle {stroke: #4691f6; stroke-width: 1;}</style>").appendTo("head");
+        $("<style type='text/css'>.modal{display:none;position:fixed;z-index:1;left:0;top:0;width:100%;height:100%;overflow:auto;background-color:#000;background-color:rgba(0,0,0,.4)}.modal-content{background-color:#fefefe;margin:15% auto;padding:20px;border:1px solid #888;width:80%}.close{color:#aaa;float:right;font-size:28px;font-weight:700}.close:focus,.close:hover{color:#000;text-decoration:none;cursor:pointer}#myProgress{width:100%;background-color:grey}#myBar{width:1%;height:30px;background-color:green}</style>").appendTo("head");
         var button = $("<a/>")
             .addClass("l1")
             .addClass("nav-icn")
@@ -34,11 +35,23 @@
             .click(function(e){console.log("Starting Download");startDownload(e);});
         var li = $("<li/>");
         li.append(button);
-
+        $('<button id="myBtn">Open Modal</button><div id="myModal" class="modal"><div class="modal-content"> <span id="mClose" class="close">&times;</span><p>Some text in the Modal..</p><div id="myProgress"><div id="myBar"></div></div></div></div>').appendTo("body");
         $("div.drop-content ul:first").children("li:nth-last-child(2)").after(li);
     }
 
     function startDownload(e){
+        var modal = document.getElementById("myModal");
+        var mClose = document.getElementById("mClose");
+        console.log(mClose);
+        modal.style.display = "block";
+
+        mClose.onclick = function(){modal.style.display = "none";}
+        
+        window.onclick = function(e){
+            if(e.target == modal){
+                modal.style.display = "none";
+            }
+        }
         e.preventDefault();
         // Get the Book information
         $.get(baseURL + "/nest/epub/toc/?book_id=" + bookId, function(bookData){        
@@ -90,10 +103,19 @@
                             jepub.add(chapters[i].name, chapters[i].html, i+1);
                         }
                         //console.log(jepub);
-                        jepub.generate('blob', function updateCallback(metadata){
+                        myBar = document.getElementById("myBar");
+                        jepub.generate('blob', function updateCallback(metadata, myBar){
                             // TODO: Something better with ths progression data
-                            // console.log("progression: " + metadata.percent.toFixed(2) + " %");
-                        }).then(function(content){downloadBlob(content, bookData.title + ".epub");})
+                            var width =  metadata.percent.toFixed(2);
+                            if (width >= 100) {
+                                // TODO: Print some fancy success message.
+                                i = 0;
+                            } else {
+                                width++;
+                                myBar.style.width = width + "%";
+                            }                        
+                        }).then(function(content){//downloadBlob(content, bookData.title + ".epub");
+                        })
                     }
                 )
             })
