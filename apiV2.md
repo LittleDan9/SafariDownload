@@ -24,7 +24,8 @@ https://learning.oreilly.com/api/v2/epubs/urn:orm:book:9781617291654/
    "total_running_time_secs":int,
    "total_size":int,
    "descriptions":{
-      "text/html":string:HTML
+      "text/html":string:HTML,
+      "text/plain":string
    },
    "spine":string:URL,
    "files":string:URL,
