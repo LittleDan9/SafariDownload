@@ -18,6 +18,7 @@
     var chapters = Array()
     const regEx = /\/[0-9]{10,13}\//g
     const baseURL = "https://learning.oreilly.com";
+    const apiBase = "https://learning.oreilly.com/api/v2/epubs/urn:orm:book:"
     var bookId = window.location.href.match(regEx)[0].replace(/\//g,'')
     if(bookId === undefined){
         console.error("Unable to extract book Id.");
@@ -40,48 +41,45 @@
     function startDownload(e){
         e.preventDefault();
         // Get the Book information
-        $.get(baseURL + "/nest/epub/toc/?book_id=" + bookId, function(bookData){
+        $.get(apiBase + bookId, function(bookData){
+            console.log(bookData);
             //Get Book details
-            $.get(baseURL + bookData.detail_url, function(detail){
-                console.log(bookData);
-                var html = $($.parseHTML(detail));
-                var desc = html.find("[class^=description]").find("span")[0].outerHTML;
-                jepub.init({
-                    i18n: 'en', // Internationalization
-                    title: bookData.title,
-                    author: bookData.authors,
-                    publisher: bookData.publisher.name,
-                    description: desc,
-                    //tags: [ 'epub', 'tag' ], // optional
-                    date: Date.parse(bookData.pub_data)
-                });
-                jepub.uuid(bookId);
-                // console.log(bookData)
-                // return;
+            jepub.init({
+                i18n: 'en', // Internationalization
+                title: bookData.title,
+                //TODO: Pull this from the v1 API?
+                //author: bookData.authors,
+                //publisher: bookData.publisher.name,
+                description: bookData.descriptions["text/html"],
+                //tags: [ 'epub', 'tag' ], // optional
+                date: Date.parse(bookData.pub_data)
+            });
+            jepub.uuid(bookId);
 
-                downloadImage(baseURL, "/covers/" + bookId + "/600w/").then(
-                    function(dlResult){
-                        var reader = new FileReader();
-                        reader.readAsArrayBuffer(dlResult.blob);
-                        reader.onloadend = function() {
-                            var buffer = reader.result;
-                            jepub.cover(buffer);
-                        }
+            downloadImage(baseURL, "/covers/" + bookId + "/600w/").then(
+                function(dlResult){
+                    var reader = new FileReader();
+                    reader.readAsArrayBuffer(dlResult.blob);
+                    reader.onloadend = function() {
+                        var buffer = reader.result;
+                        jepub.cover(buffer);
                     }
-                )
-
-                // Download Chapter Content
-                chapters = Array(bookData.items.length);
-                var chapterPromises = [];
-                for(var i = 0; i < bookData.items.length; i++){
-                    chapterPromises.push(getChapter(bookData.items[i]))
                 }
-                //console.log("test");
+            )
+            // Download Chapter Content
+            $.get(bookData.chapters, function(chapterData){
+                chapters = Array(chapterData.results.lenght);
+                console.log(chapterData);
+                var chapterPromises = [];
+                for(var i = 0; i < chapterData.results.length; i++){
+                    chapterPromises.push(getChapter(chapterData.results[i]))
+                }
+            //console.log("test");
                 Promise.allSettled(chapterPromises).then(
                     function(results){
                         // console.log(results);
                         chapters = chapters.filter(function(e){return e != null;})
-                        console.log(chapters);
+                        //console.log(chapters);
                         for(var i = 0; i < chapters.length; i++){
                             //console.log(i + ". Add Content")
                             if(chapters[i].name.length == 0 && chapters[i].html.length > 0){
@@ -89,29 +87,27 @@
                             }
                             jepub.add(chapters[i].name, chapters[i].html, i+1);
                         }
-                        //console.log(jepub);
+                        console.log(jepub);
                         jepub.generate('blob', function updateCallback(metadata){
                             // TODO: Something better with ths progression data
                             // console.log("progression: " + metadata.percent.toFixed(2) + " %");
                         }).then(function(content){downloadBlob(content, bookData.title + ".epub");})
                     }
                 )
-            })
+            });
         });
     }
 
     function getChapter(chapter){
-        return;
         return new Promise((resolve, reject) => {
             $.ajax({
-                url: baseURL + chapter.url,
+                url: chapter.content_url,
                 success: function(chapterDetails){
                     $.get(chapterDetails.content, function(chapterHTML){
                         processChapter(
-                            chapterDetails.title,
-                            chapter.order,
-                            chapterDetails.images,
-                            chapterDetails.asset_base_url,
+                            chapter.title,
+                            chapter.indexed_position,
+                            chapter.related_assets.images,
                             chapterHTML
                         ).then(function(){
                             resolve(chapterDetails);
@@ -125,18 +121,19 @@
 
 
 
-    function processChapter(chapterName, chapterOrder, images, imgBaseURL, chapterHTML){
+    function processChapter(chapterName, chapterOrder, images, chapterHTML){
         return new Promise((resolve, reject) => {
             try{
                 var chapterDOMTree = $('<div>' + chapterHTML + '</div>');
                 // console.log(imgBaseURL);
                 // console.log(images);
                 if(images.length > 0){
+                    console.log(images);
                     // console.log("Image Count: " + images.length);
                     var imgPromises = [];
-                    $.each(images, function(key, imgURL){
+                    $.each(images, function(key, value){
                         //Get the blob of the image and store it in the ebup
-                        imgPromises.push(downloadImage(imgBaseURL, imgURL));
+                        imgPromises.push(downloadImage(value));
                     });
                     Promise.allSettled(imgPromises).then(
                         function(results) {
@@ -182,10 +179,10 @@
         chapters[index-1] = {name: name, html: html};
     }
 
-    let downloadImage = function(imgBaseURL, imgURL) {
+    let downloadImage = function(imgURL) {
         return new Promise(function(resolve, reject){
             jQuery.ajax({
-                url: imgBaseURL + imgURL,
+                url: imgURL,
                 cache:false,
                 xhr: function(){
                     var xhr = new XMLHttpRequest();
